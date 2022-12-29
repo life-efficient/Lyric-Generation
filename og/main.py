@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
+import random
 
 
 def create_vocab(rawtxt):
@@ -37,9 +38,8 @@ class RNN(torch.nn.Module):
     def __init__(self, vocab_size, hidden_size, n_layers=1):
         super().__init__()
         # store input parameters in the object so we can use them later on
-        self.input_size = vocab_size
+        self.vocab_size = vocab_size
         self.hidden_size = hidden_size
-        self.output_size = vocab_size
         self.n_layers = n_layers
 
         # required functions for model
@@ -48,19 +48,28 @@ class RNN(torch.nn.Module):
                                 n_layers, batch_first=True)
         self.decoder = torch.nn.Linear(hidden_size, vocab_size)
 
-    def forward(self, x, hidden):
+    def forward(self, x):
         # encode our input into a vector embedding
         x = self.encoder(x.view(1, -1))
         # calculate the output from our rnn based on our input and previous hidden state
-        output, hidden = self.rnn(x.view(1, 1, -1), hidden)
+        output, self.hidden = self.rnn(x.view(1, 1, -1), self.hidden)
         # calculate our output based on output of rnn
         output = self.decoder(output.view(1, -1))
 
-        return output, hidden
+        return output
 
     def init_hidden(self):
-        # initialize our hidden state to a matrix of 0s
-        return torch.zeros(self.n_layers, 1, self.hidden_size)
+        self.hidden = torch.zeros(self.n_layers, 1, self.hidden_size)
+
+    def generate(self):
+        self.init_hidden()
+        current_token_id = random.randint(0, self.vocab_size)
+        generated = ""
+        for idx in range(1000):
+            predicted = self.forward(current_token_id)
+            current_token_id = torch.argmax(predicted)
+            generated.append(current_token_id)
+        return generated
 
 
 def train(model, epochs=1):
@@ -75,7 +84,7 @@ def train(model, epochs=1):
         # given our chunk size, how many chunks do we need to optimizer over to have gone thorough our whole dataset
         n_chunks = len(X)//chunk_size
         for chunk_idx in range(n_chunks):
-            h = model.init_hidden()  # initialize our hidden state to 0s
+            model.init_hidden()  # initialize our hidden state to 0s
             cost = 0  # cost for this chunk
             # get a random sequence chunk to train
             x, y = random_chunk(chunk_size)
@@ -83,7 +92,7 @@ def train(model, epochs=1):
             # sequentially input each character in our sequence and calculate loss
             for i in range(chunk_size):
                 # calculate outputs based on input and previous hidden state
-                out, h = model.forward(x[i], h)
+                out = model.forward(x[i])
 
                 # based on our output, what character does our network predict is next?
                 predicted_token_id = torch.argmax(out).item()
@@ -107,7 +116,9 @@ def train(model, epochs=1):
 
         print('Epoch ', epoch, ' Avg cost/chunk: ', epoch_cost.item())
         # print('Generated text: ', generated, '\n')
-        writer.add_text("Generated Text", generated[:100], epoch)
+        writer.add_text("Generated Text", generated[:300], epoch)
+        generated_token_ids = model.generate()
+        print(tokeniser.decode(generated_token_ids))
 
 
 if __name__ == "__main__":
