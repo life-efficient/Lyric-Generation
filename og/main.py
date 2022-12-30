@@ -27,12 +27,28 @@ class Tokeniser:
     def decode(self, token_ids):
         return "".join([self.id_to_token[id] for id in token_ids])
 
-# return a random batch for training
 
+class LyricDataset():
+    def __init__(self, chunk_size=100):
+        self.chunk_size = chunk_size
+        with open('lyrics.txt', 'r') as file:
+            txt = file.read()
+        txt = txt.lower()
 
-def random_chunk(chunk_size):
-    k = np.random.randint(0, len(X)-chunk_size)
-    return zip(X[k:k+chunk_size], Y[k:k+chunk_size])
+        self.tokeniser = Tokeniser(txt)
+
+        self.X = torch.tensor(self.tokeniser.encode(txt))
+        self.Y = torch.tensor(np.roll(self.X, -1, axis=0))
+
+        self.vocab_size = len(set(txt))
+
+    def __getitem__(self, idx):
+        k = np.random.randint(0, len(self.X)-chunk_size)
+        slc = slice(k, k+self.chunk_size)
+        return self.X[slc], self.Y[slc]
+
+    def __len__(self):
+        return len(self.X) // self.chunk_size
 
 
 class RNN(torch.nn.Module):
@@ -51,8 +67,7 @@ class RNN(torch.nn.Module):
 
     def forward(self, x):
         # encode our input into a vector embedding
-        print(x)
-        x = self.embedding(x.view(1, -1))
+        x = self.embedding(x.unsqueeze(0)).unsqueeze(0)
         # calculate the output from our rnn based on our input and previous hidden state
         output, self.hidden = self.rnn(x.view(1, 1, -1), self.hidden)
         # calculate our output based on output of rnn
@@ -74,28 +89,46 @@ class RNN(torch.nn.Module):
             generated.append(int(current_token_id))
         return generated
 
+
+class RNNFullSeq(RNN):
+    def forward(self, X):
+        self.init_hidden()
+        outputs, hidden = self.rnn(X, self.hidden())
+        print(outputs.shape)
+        print(hidden.shape)
+        sdcds
+        return self.decoder(outputs)
+
 # def train_one_sequence(model, seq):
 
+# def train_full_seq(model, epochs=1):
 
-def train(model, epochs=1):
+
+def train(model, dataset, epochs=1):
     writer = SummaryWriter()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)  # choose optimizer
     n_steps = 0
     for epoch in range(epochs):
         epoch_loss = 0  # stored the loss per epoch
 
-        n_chunks = len(X) // chunk_size
-        for chunk_idx in range(n_chunks):
-            model.init_hidden()
+        for seq_inputs, seq_targets in dataset:
+
+            # n_chunks = len(X) // chunk_size
+            # for chunk_idx in range(n_chunks):
             loss = 0
+            # sequence = random_chunk(chunk_size)
 
-            sequence = random_chunk(chunk_size)
+            if type(model) is RNN:
+                model.init_hidden()
+                sequence = zip(seq_inputs, seq_targets)
 
-            # sequentially input each character in our sequence and calculate loss
-            for current_token_id, next_token_id in sequence:
-                logits = model(current_token_id)
-                target = next_token_id.unsqueeze(0)
-                loss += F.cross_entropy(logits, target)
+                # sequentially input each character in our sequence and calculate loss
+                for current_token_id, next_token_id in sequence:
+                    logits = model(current_token_id)
+                    target = next_token_id.unsqueeze(0)
+                    loss += F.cross_entropy(logits, target)
+            elif type(model) is RNNFullSeq:
+                sdcds
 
             optimizer.zero_grad()
             loss.backward()
@@ -111,27 +144,17 @@ def train(model, epochs=1):
         generated_token_ids = model.generate()
         writer.add_text("Generated Text", tokeniser.decode(
             generated_token_ids)[:300], epoch)
+        break  # for testing purposes
 
 
 if __name__ == "__main__":
-    with open('lyrics.txt', 'r') as file:
-        txt = file.read()
-    txt = txt.lower()
-
-    tokeniser = Tokeniser(txt)
-
-    X = tokeniser.encode(txt)
-    Y = np.roll(X, -1, axis=0)
-    X = torch.tensor(X)
-    Y = torch.tensor(Y)
-
-    n_tokens = len(set(txt))
 
     # HYPER-PARAMS
     lr = 0.005
     epochs = 500
     chunk_size = 100  # the length of the sequences which we will optimize over
 
+    dataset = LyricDataset()
     # instantiate our model from the class defined earlier
     myrnn = RNN(n_tokens, 50, 2)
     train(myrnn, epochs)
