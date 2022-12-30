@@ -64,7 +64,7 @@ class RNN(torch.nn.Module):
         # required functions for model
         self.embedding = torch.nn.Embedding(vocab_size, hidden_size)
         self.rnn = torch.nn.RNN(hidden_size, hidden_size,
-                                n_layers, batch_first=True)
+                                n_layers, batch_first=True)  # TODO remove batch first
         self.decoder = torch.nn.Linear(hidden_size, vocab_size)
 
     def forward(self, x):
@@ -78,6 +78,7 @@ class RNN(torch.nn.Module):
         return output
 
     def init_hidden(self):
+        # TODO remove batch dim
         self.hidden = torch.zeros(self.n_layers, 1, self.hidden_size)
 
     def generate(self):
@@ -94,12 +95,17 @@ class RNN(torch.nn.Module):
 
 class RNNFullSeq(RNN):
     def forward(self, X):
-        self.init_hidden()
-        outputs, hidden = self.rnn(X, self.hidden())
-        print(outputs.shape)
-        print(hidden.shape)
-        sdcds
-        return self.decoder(outputs)
+        self.init_hidden(X.shape[0])
+        embedding = self.embedding(X)
+        outputs, hidden = self.rnn(embedding, self.hidden)
+        # print(hidden.shape)
+        # print(outputs.shape)
+        predictions = self.decoder(outputs)
+        # print("final output shape:", predictions.shape)
+        return predictions
+
+    def init_hidden(self, batch_size):
+        self.hidden = torch.zeros(self.n_layers, batch_size, self.hidden_size)
 
 # def train_one_sequence(model, seq):
 
@@ -130,7 +136,22 @@ def train(model, dataset, epochs=1):
                     target = next_token_id.unsqueeze(0)
                     loss += F.cross_entropy(logits, target)
             elif type(model) is RNNFullSeq:
-                sdcds
+                # add batch dim TODO remove once using dataloader
+                seq_inputs = seq_inputs.unsqueeze(0)
+                # print(seq_inputs.shape)
+                predictions = model(seq_inputs)
+                # predictions = torch.argmax(predictions, dim=2)
+                seq_targets = seq_targets.unsqueeze(0)
+
+                # this part is important
+                # cross entropy thinks that the dimension after the batch should either be a class idx or a distribution
+                # in our case it's a timestep
+                # so we need to treat each (batch, timestep) pair as a different batch
+                # e.g. B=4, T=100 -> B'=B*T=400
+                # (BxT, vocab_size)
+                predictions = predictions.view(-1, predictions.shape[-1])
+                seq_targets = seq_targets.view(-1)  # BxT targets all in a line
+                loss = F.cross_entropy(predictions, seq_targets)
 
             optimizer.zero_grad()
             loss.backward()
@@ -164,6 +185,8 @@ if __name__ == "__main__":
     dataset = LyricDataset(chunk_size=chunk_size)
     n_tokens = len(dataset.tokeniser.id_to_token)
     # instantiate our model from the class defined earlier
+    myrnn = RNNFullSeq(n_tokens, hidden_size, n_layers)
+    train(myrnn, dataset, epochs)
     myrnn = RNN(n_tokens, hidden_size, n_layers)
     train(myrnn, dataset, epochs)
 
