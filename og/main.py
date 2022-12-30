@@ -5,6 +5,7 @@ from torch.autograd import Variable
 from torch.utils.tensorboard import SummaryWriter
 import random
 import torch.nn.functional as F
+from tqdm import tqdm
 
 
 def create_vocab(rawtxt):
@@ -42,13 +43,14 @@ class LyricDataset():
 
         self.vocab_size = len(set(txt))
 
-    def __getitem__(self, idx):
-        k = np.random.randint(0, len(self.X)-chunk_size)
-        slc = slice(k, k+self.chunk_size)
-        return self.X[slc], self.Y[slc]
-
     def __len__(self):
         return len(self.X) // self.chunk_size
+
+    def __iter__(self):
+        for idx in range(len(self)):
+            k = np.random.randint(0, len(self.X)-chunk_size)
+            slc = slice(k, k+self.chunk_size)
+            yield self.X[slc], self.Y[slc]
 
 
 class RNN(torch.nn.Module):
@@ -111,7 +113,7 @@ def train(model, dataset, epochs=1):
     for epoch in range(epochs):
         epoch_loss = 0  # stored the loss per epoch
 
-        for seq_inputs, seq_targets in dataset:
+        for seq_inputs, seq_targets in tqdm(dataset):
 
             # n_chunks = len(X) // chunk_size
             # for chunk_idx in range(n_chunks):
@@ -152,11 +154,15 @@ if __name__ == "__main__":
     # HYPER-PARAMS
     lr = 0.005
     epochs = 500
-    chunk_size = 100  # the length of the sequences which we will optimize over
+    chunk_size = 10  # the length of the sequences which we will optimize over
 
-    dataset = LyricDataset()
+    hidden_size = 50
+    n_layers = 2
+
+    dataset = LyricDataset(chunk_size=chunk_size)
+    n_tokens = len(dataset.tokeniser.id_to_token)
     # instantiate our model from the class defined earlier
-    myrnn = RNN(n_tokens, 50, 2)
-    train(myrnn, epochs)
+    myrnn = RNN(n_tokens, hidden_size, n_layers)
+    train(myrnn, dataset, epochs)
 
 # %%
