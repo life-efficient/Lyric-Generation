@@ -140,12 +140,14 @@ def train(model, dataset, epochs=1):
 
             epoch_loss += loss  # add the loss of this sequence to the loss of this epoch
 
-        epoch_loss /= n_chunks  # avg loss per chunk
+        epoch_loss /= len(dataset)  # avg loss per chunk
 
         print('Epoch ', epoch, ' Avg loss/chunk: ', epoch_loss.item())
         generated_token_ids = model.generate()
-        writer.add_text("Generated Text", tokeniser.decode(
+        writer.add_text("Generated Text", dataset.tokeniser.decode(
             generated_token_ids)[:300], epoch)
+
+        print("breaking for testing purposes")
         break  # for testing purposes
 
 
@@ -154,7 +156,7 @@ if __name__ == "__main__":
     # HYPER-PARAMS
     lr = 0.005
     epochs = 500
-    chunk_size = 10  # the length of the sequences which we will optimize over
+    chunk_size = 100  # the length of the sequences which we will optimize over
 
     hidden_size = 50
     n_layers = 2
