@@ -55,12 +55,12 @@ class LyricDataset(Dataset):
         return
 
 
-class WikiTextDataset(torch.utils.data.Dataset):
-    def __init__(self):
-        dataset = load_dataset("wikitext", 'wikitext-103-v1',
-                               split='test')
+# class WikiTextDataset(torch.utils.data.Dataset):
+#     def __init__(self):
+#         dataset = load_dataset("wikitext", 'wikitext-103-v1',
+#                                split='test')
 
-        self.examples =
+        # self.examples =
 
 
 if __name__ == "__main__":

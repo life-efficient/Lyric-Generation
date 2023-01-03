@@ -61,6 +61,9 @@ class RNN(torch.nn.Module):
             predicted_sequence.append(current_token_id)
         return predicted_sequence
 
+    # def generate_from_prompt(self, prompt):
+    #     self
+
 
 def train(model, dataset, epochs=10):
     writer = SummaryWriter()
@@ -105,7 +108,7 @@ def train(model, dataset, epochs=10):
             print(dataset.tokeniser.decode(generated_sequence))
 
 
-dataset = LyricDataset(vocab_size=10000)
+dataset = LyricDataset(vocab_size=10000, seq_len=)
 n_embeddings = dataset.tokeniser.get_vocab_size()
 # loader = DataLoader(dataset, shuffle=True, batch_size=4)
 model = RNN(n_embeddings)

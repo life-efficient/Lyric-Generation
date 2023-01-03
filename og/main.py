@@ -97,7 +97,7 @@ class RNNFullSeq(RNN):
     def forward(self, X):
         self.init_hidden(X.shape[0])
         embedding = self.embedding(X)
-        outputs, hidden = self.rnn(embedding, self.hidden)
+        outputs, final_hidden = self.rnn(embedding, self.hidden)
         # print(hidden.shape)
         # print(outputs.shape)
         predictions = self.decoder(outputs)
@@ -106,6 +106,28 @@ class RNNFullSeq(RNN):
 
     def init_hidden(self, batch_size):
         self.hidden = torch.zeros(self.n_layers, batch_size, self.hidden_size)
+
+    def generate(self):
+        self.init_hidden(batch_size=1)
+        initial_token_id = random.randint(0, 49-1)
+        generated_token_ids = [initial_token_id]
+        initial_token_batch = torch.tensor(initial_token_id).unsqueeze(
+            0).unsqueeze(0)  # TODO SOS token
+        embedding = self.embedding(initial_token_batch)
+        for idx in range(100):  # generate 100 character sequence
+            outputs, self.hidden = self.rnn(embedding, self.hidden)
+            predictions = self.decoder(outputs)
+            # outputs has shape BxLxN=1x1xN
+            predictions = predictions.squeeze()  # remove 1-dims
+            chosen_token_id = torch.argmax(predictions)
+            generated_token_ids.append(int(chosen_token_id))
+            embedding = self.embedding(
+                chosen_token_id).unsqueeze(0).unsqueeze(0)
+        return generated_token_ids
+
+        print(generated_logits.shape)
+        scsd
+        return
 
 # def train_one_sequence(model, seq):
 
@@ -151,6 +173,8 @@ def train(model, dataset, epochs=1):
                 # (BxT, vocab_size)
                 predictions = predictions.view(-1, predictions.shape[-1])
                 seq_targets = seq_targets.view(-1)  # BxT targets all in a line
+                # print(predictions.shape)
+                # print(seq_targets.shape)
                 loss = F.cross_entropy(predictions, seq_targets)
 
             optimizer.zero_grad()
@@ -168,8 +192,8 @@ def train(model, dataset, epochs=1):
         writer.add_text("Generated Text", dataset.tokeniser.decode(
             generated_token_ids)[:300], epoch)
 
-        print("breaking for testing purposes")
-        break  # for testing purposes
+        # print("breaking for testing purposes")
+        # break  # for testing purposes
 
 
 if __name__ == "__main__":
@@ -187,7 +211,7 @@ if __name__ == "__main__":
     # instantiate our model from the class defined earlier
     myrnn = RNNFullSeq(n_tokens, hidden_size, n_layers)
     train(myrnn, dataset, epochs)
-    myrnn = RNN(n_tokens, hidden_size, n_layers)
-    train(myrnn, dataset, epochs)
+    # myrnn = RNN(n_tokens, hidden_size, n_layers)
+    # train(myrnn, dataset, epochs)
 
 # %%
